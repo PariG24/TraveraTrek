@@ -22,13 +22,25 @@ const yellowHumanIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-const SetViewToCurrentLocation = ({ center }: { center: [number, number] | null }) => {
+const TrackUserLocation = ({ position }: { position: [number, number] | null }) => {
   const map = useMap();
+  const initialZoom = useRef(true);
+  const userZoomLevel = useRef<number | null>(null);
+
   useEffect(() => {
-    if (center) {
-      map.setView(center, 13, { animate: true });
+    if (position) {
+      console.log('User Location:', position);
+      if (initialZoom.current) {
+        map.setView(position, 18, { animate: true });
+        userZoomLevel.current = map.getZoom();
+        initialZoom.current = false;
+      } else {
+        const zoomLevel = userZoomLevel.current || map.getZoom();
+        map.panTo(position, { animate: true, duration: 1.5, easeLinearity: 0.25 });
+      }
     }
-  }, [center, map]);
+  }, [position, map]);
+
   return null;
 };
 
@@ -39,11 +51,19 @@ const WorldMap = () => {
 
   useEffect(() => {
     if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition((position) => {
-        const { latitude, longitude } = position.coords;
-        setCurrentLocation([latitude, longitude]);
-        setMapReady(true);
-      });
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const newLocation: [number, number] = [latitude, longitude];
+          console.log('New user coordinates:', newLocation);
+          setCurrentLocation(newLocation);
+          setMapReady(true);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+        },
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+      );
 
       return () => navigator.geolocation.clearWatch(watchId);
     }
@@ -51,7 +71,7 @@ const WorldMap = () => {
 
   const handleMarkerClick = (coordinates: [number, number]) => {
     if (mapRef.current) {
-      mapRef.current.flyTo(coordinates, 18, { animate: true }); // Set to a reasonable zoom level
+      mapRef.current.flyTo(coordinates, 18, { animate: true }); // Fly to the clicked marker
     }
   };
 
@@ -61,7 +81,7 @@ const WorldMap = () => {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      {mapReady && currentLocation && <SetViewToCurrentLocation center={currentLocation} />}
+      {mapReady && currentLocation && <TrackUserLocation position={currentLocation} />}
       {currentLocation && (
         <Marker position={currentLocation} icon={yellowHumanIcon} eventHandlers={{ click: () => handleMarkerClick(currentLocation) }}>
           <Popup>
