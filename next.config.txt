@@ -1,0 +1,10 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  transpilePackages: ['react-leaflet', '@react-leaflet', 'leaflet'],
+  images: {
+    domains: ['hebbkx1anhila5yf.public.blob.vercel-storage.com'], // Allow external images
+  },
+};
+
+module.exports = nextConfig;
