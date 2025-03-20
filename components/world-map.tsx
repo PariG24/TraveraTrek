@@ -1,65 +1,84 @@
-import React, { useRef, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useRef, useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { locations } from '@/data/locations';
 
 // Fix for default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
 });
 
+// Custom yellow icon for current location
+const yellowHumanIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
+  shadowSize: [41, 41]
+});
+
+const SetViewToCurrentLocation = ({ center }: { center: [number, number] | null }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, 13, { animate: true });
+    }
+  }, [center, map]);
+  return null;
+};
+
 const WorldMap = () => {
   const mapRef = useRef<L.Map | null>(null);
-
-  const center: [number, number] = [0, 0]; // Default center
-  const zoom = 2; // Default zoom level
+  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
-    if (mapRef.current) {
-      mapRef.current.whenReady(() => {
-        console.log('Map is ready');
+    if (navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition((position) => {
+        const { latitude, longitude } = position.coords;
+        setCurrentLocation([latitude, longitude]);
+        setMapReady(true);
       });
+
+      return () => navigator.geolocation.clearWatch(watchId);
     }
   }, []);
 
   const handleMarkerClick = (coordinates: [number, number]) => {
     if (mapRef.current) {
-      console.log('Zooming to:', coordinates);
-      mapRef.current.setView(coordinates, 10); // Zoom level 10 when a marker is clicked
-    } else {
-      console.log('Map reference is null');
+      mapRef.current.flyTo(coordinates, 18, { animate: true }); // Set to a reasonable zoom level
     }
   };
 
   return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
-      style={{ height: '100vh', width: '100%' }}
-      ref={mapRef}
-    >
+    <MapContainer center={currentLocation || [0, 0]} zoom={2} style={{ height: '100vh', width: '100%' }} ref={mapRef}>
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      {locations.map((location) => (
-        <Marker
-          key={location.id}
-          position={location.coordinates}
-          eventHandlers={{
-            click: () => handleMarkerClick(location.coordinates),
-          }}
-        >
+      {mapReady && currentLocation && <SetViewToCurrentLocation center={currentLocation} />}
+      {currentLocation && (
+        <Marker position={currentLocation} icon={yellowHumanIcon} eventHandlers={{ click: () => handleMarkerClick(currentLocation) }}>
           <Popup>
-            <strong>{location.name}</strong><br />
-            {location.address}<br />
-            <a href={location.instagramLink} target="_blank" rel="noopener noreferrer">
-              <button className="mt-2 px-4 py-2 bg-blue-500 text-white rounded">View on Instagram</button>
-            </a>
+            <div>
+              <h3>You're Currently Here</h3>
+            </div>
+          </Popup>
+        </Marker>
+      )}
+      {locations.map((location, index) => (
+        <Marker key={index} position={location.coordinates} eventHandlers={{ click: () => handleMarkerClick(location.coordinates) }}>
+          <Popup>
+            <div>
+              <h3>{location.name}</h3>
+              <p>{location.address}</p>
+              <a href={location.instagramLink} target="_blank" rel="noopener noreferrer">Instagram</a>
+            </div>
           </Popup>
         </Marker>
       ))}
