@@ -106,4 +106,4 @@ const WorldMap = () => {
   );
 };
 
-export default WorldMap;
+export default WorldMap; //test
